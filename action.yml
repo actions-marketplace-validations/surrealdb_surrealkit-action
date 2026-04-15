@@ -1,0 +1,131 @@
+name: 'SurrealKit'
+description: 'Install SurrealKit and run migrations, tests, sync, seed, or any subcommand in CI.'
+author: 'SurrealDB'
+branding:
+  icon: 'database'
+  color: 'purple'
+
+inputs:
+  version:
+    description: 'SurrealKit version to install (e.g. "v0.5.3"). Use "latest" to resolve the most recent release.'
+    required: false
+    default: 'latest'
+  command:
+    description: 'SurrealKit subcommand to run after install. Set to an empty string to install only.'
+    required: false
+    default: 'test'
+  args:
+    description: 'Additional arguments appended to the subcommand.'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Directory containing your SurrealKit project (the folder with "database/").'
+    required: false
+    default: '.'
+  host:
+    description: 'SurrealDB host, mapped to SURREALDB_HOST.'
+    required: false
+    default: ''
+  ns:
+    description: 'SurrealDB namespace, mapped to SURREALDB_NAMESPACE.'
+    required: false
+    default: ''
+  db:
+    description: 'SurrealDB database, mapped to SURREALDB_NAME.'
+    required: false
+    default: ''
+  user:
+    description: 'SurrealDB username, mapped to SURREALDB_USER.'
+    required: false
+    default: ''
+  pass:
+    description: 'SurrealDB password, mapped to SURREALDB_PASSWORD.'
+    required: false
+    default: ''
+  github-token:
+    description: 'Token used to query the GitHub releases API when resolving "latest".'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: 'The resolved SurrealKit version that was installed.'
+    value: ${{ steps.install.outputs.version }}
+  path:
+    description: 'Absolute path to the installed SurrealKit binary directory.'
+    value: ${{ steps.install.outputs.path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install SurrealKit
+      id: install
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+      run: |
+        set -euo pipefail
+
+        VERSION="$INPUT_VERSION"
+        if [ "$VERSION" = "latest" ] || [ -z "$VERSION" ]; then
+          auth=()
+          if [ -n "${GH_TOKEN:-}" ]; then auth=(-H "Authorization: Bearer $GH_TOKEN"); fi
+          VERSION=$(curl -fsSL "${auth[@]}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/surrealdb/surrealkit/releases?per_page=30" \
+            | jq -r '[.[] | select(.draft == false and (.assets | length > 0))][0].tag_name // empty')
+        fi
+        if [ -z "$VERSION" ]; then echo "::error::Could not resolve a SurrealKit version."; exit 1; fi
+        case "$VERSION" in v*) ;; *) VERSION="v$VERSION" ;; esac
+
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64)    TRIPLE="x86_64-unknown-linux-gnu"; EXT="tar.gz" ;;
+          macOS-ARM64)  TRIPLE="aarch64-apple-darwin";     EXT="tar.gz" ;;
+          Windows-X64)  TRIPLE="x86_64-pc-windows-msvc";   EXT="zip"    ;;
+          *) echo "::error::Unsupported runner $RUNNER_OS-$RUNNER_ARCH."; exit 1 ;;
+        esac
+
+        ASSET="surrealkit-${VERSION}-${TRIPLE}.${EXT}"
+        URL="https://github.com/surrealdb/surrealkit/releases/download/${VERSION}/${ASSET}"
+        INSTALL_DIR="$HOME/.surrealkit/${VERSION}"
+        BIN="${INSTALL_DIR}/surrealkit"
+        if [ "$RUNNER_OS" = "Windows" ]; then BIN="${INSTALL_DIR}/surrealkit.exe"; fi
+
+        if [ ! -x "$BIN" ]; then
+          mkdir -p "$INSTALL_DIR"
+          TMP="$(mktemp -d)"
+          curl -fsSL -o "$TMP/$ASSET" "$URL"
+          case "$EXT" in
+            tar.gz) tar -xzf "$TMP/$ASSET" -C "$INSTALL_DIR" ;;
+            zip)    unzip -q -o "$TMP/$ASSET" -d "$INSTALL_DIR" ;;
+          esac
+          chmod +x "$BIN" 2>/dev/null || true
+        fi
+
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "path=$INSTALL_DIR" >> "$GITHUB_OUTPUT"
+        echo "::notice title=SurrealKit installed::$VERSION ($TRIPLE)"
+
+    - name: Run SurrealKit
+      if: ${{ inputs.command != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SURREALDB_HOST: ${{ inputs.host }}
+        SURREALDB_NAMESPACE: ${{ inputs.ns }}
+        SURREALDB_NAME: ${{ inputs.db }}
+        SURREALDB_USER: ${{ inputs.user }}
+        SURREALDB_PASSWORD: ${{ inputs.pass }}
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        for v in SURREALDB_HOST SURREALDB_NAMESPACE SURREALDB_NAME SURREALDB_USER SURREALDB_PASSWORD; do
+          if [ -z "${!v}" ]; then unset "$v"; fi
+        done
+        echo "+ surrealkit $INPUT_COMMAND $INPUT_ARGS"
+        # shellcheck disable=SC2086
+        surrealkit $INPUT_COMMAND $INPUT_ARGS
