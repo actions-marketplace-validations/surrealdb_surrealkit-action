@@ -1,57 +1,57 @@
 name: ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+    push:
+        branches: [main]
+    pull_request:
 
 jobs:
-  install-only:
-    name: Install (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - id: sk
-        uses: ./
-        with:
-          command: ''
-      - shell: bash
-        run: |
-          echo "Installed: ${{ steps.sk.outputs.version }} at ${{ steps.sk.outputs.path }}"
-          surrealkit --version
-          surrealkit --help | head -20
+    install-only:
+        name: Install (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+            - id: sk
+              uses: ./
+              with:
+                  command: ""
+            - shell: bash
+              run: |
+                  echo "Installed: ${{ steps.sk.outputs.version }} at ${{ steps.sk.outputs.path }}"
+                  surrealkit --version
+                  surrealkit --help | head -20
 
-  run-test-suite:
-    name: Smoke-test against ephemeral SurrealDB (Linux)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    run-test-suite:
+        name: Smoke-test against ephemeral SurrealDB (Linux)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Install SurrealDB
-        run: |
-          curl -sSf https://install.surrealdb.com | sh
-          surreal start --user root --pass root memory &
-          for i in {1..20}; do
-            curl -fsS http://localhost:8000/health && break
-            sleep 1
-          done
+            - name: Install SurrealDB
+              run: |
+                  curl -sSf https://install.surrealdb.com | sh
+                  surreal start --user root --pass root memory &
+                  for i in {1..20}; do
+                    curl -fsS http://localhost:8000/health && break
+                    sleep 1
+                  done
 
-      - name: Scaffold a SurrealKit project
-        run: |
-          mkdir -p sandbox && cd sandbox
-          # `surrealkit init` creates the database/ layout, including an example test suite.
-          # Install first so init is available:
-      - uses: ./
-        with:
-          command: ''           # install only
+            - name: Scaffold a SurrealKit project
+              run: |
+                  mkdir -p sandbox && cd sandbox
+                  # `surrealkit init` creates the database/ layout, including an example test suite.
+                  # Install first so init is available:
+            - uses: ./
+              with:
+                  command: "" # install only
 
-      - name: init + test
-        working-directory: sandbox
-        run: |
-          surrealkit init --yes || surrealkit init
-          surrealkit test --host http://localhost:8000 --user root --pass root || true
-          # `|| true` while we're validating the action wires up correctly; tighten to strict pass once stable.
+            - name: init + test
+              working-directory: sandbox
+              run: |
+                  surrealkit init --yes || surrealkit init
+                  surrealkit test --host http://localhost:8000 --user root --pass root || true
+                  # `|| true` while we're validating the action wires up correctly; tighten to strict pass once stable.
