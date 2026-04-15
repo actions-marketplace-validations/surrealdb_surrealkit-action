@@ -28,7 +28,7 @@ jobs:
           SURREAL_USER: root
           SURREAL_PASS: root
         # surrealdb start requires args; use a command override:
-        # (GitHub service containers pass env, but not CLI args — if you need args,
+        # (GitHub service containers pass env, but not CLI args - if you need args,
         # run surrealdb in a step instead; see "Without service containers" below.)
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
     pass: ${{ secrets.SURREAL_PASS }}
 ```
 
-### Install only — run surrealkit manually in later steps
+### Install only - run surrealkit manually in later steps
 
 ```yaml
 - uses: surrealdb/surrealkit-action@v1
@@ -106,14 +106,14 @@ jobs:
 | `command` | `test` | Subcommand to run after install (`test`, `sync`, `seed`, `rollout`, `lint`, `status`, ...). Set to `''` to install only. |
 | `args` | `''` | Additional args appended to the subcommand. |
 | `working-directory` | `.` | Directory containing the SurrealKit project (the folder that holds `database/`). |
-| `host` | — | SurrealDB host, e.g. `http://localhost:8000`. Exported as `SURREALDB_HOST`. |
-| `ns` | — | Namespace. Exported as `SURREALDB_NAMESPACE`. |
-| `db` | — | Database name. Exported as `SURREALDB_NAME`. |
-| `user` | — | Username. Exported as `SURREALDB_USER`. |
-| `pass` | — | Password. Exported as `SURREALDB_PASSWORD`. |
+| `host` | - | SurrealDB host, e.g. `http://localhost:8000`. Exported as `SURREALDB_HOST`. |
+| `ns` | - | Namespace. Exported as `SURREALDB_NAMESPACE`. |
+| `db` | - | Database name. Exported as `SURREALDB_NAME`. |
+| `user` | - | Username. Exported as `SURREALDB_USER`. |
+| `pass` | - | Password. Exported as `SURREALDB_PASSWORD`. |
 | `github-token` | `${{ github.token }}` | Used only to resolve `latest` against the releases API. |
 
-Any connection input left blank is **not** exported — SurrealKit falls back to its own defaults (`localhost:8000`, `root/root`, namespace `db`, database `test`) or a `.env` file in the working directory.
+Any connection input left blank is **not** exported - SurrealKit falls back to its own defaults (`localhost:8000`, `root/root`, namespace `db`, database `test`) or a `.env` file in the working directory.
 
 ## Outputs
 
